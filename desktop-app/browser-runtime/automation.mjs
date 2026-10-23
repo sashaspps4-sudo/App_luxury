@@ -68,6 +68,7 @@ export function createAutomation(settings, { checkInbox, isStopped, emit, now = 
   };
   return {
     config,
+    checkNow: check,
     noteSent() { lastSent = now(); sinceCheck++; series++; },
     async beforeSend() {
       stopped();

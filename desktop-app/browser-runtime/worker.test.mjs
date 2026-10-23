@@ -122,6 +122,45 @@ async function waitFor(check, timeout = 15000) {
   }
 }
 
+test('shared cyclic campaign dispatch preserves per-profile totals and closes completed profiles', { timeout: 10000 }, async () => {
+  const { EventEmitter } = await import('node:events');
+  const input = new PassThrough();
+  const entries = [], contexts = [];
+  let exited = false;
+  const worker = runWorker({
+    stdin: input, stdout: { write(line) { entries.push(JSON.parse(line)); } }, exit() { exited = true; },
+    launchContext: async () => {
+      const context = new EventEmitter(), page = new EventEmitter();
+      page.url = () => 'https://mail.google.com/mail/u/0/'; page.isClosed = () => !!context.closed;
+      page.goto = async () => {}; page.mainFrame = () => page;
+      context.pages = () => [page];
+      context.close = async () => { if (!context.closed) { context.closed = true; context.emit('close'); } };
+      contexts.push(context); return context;
+    },
+    runProfileCampaign: async (_context, run, hooks) => {
+      assert.equal(run.runId, 'shared');
+      assert.equal(hooks.batchRunId, 'shared');
+      assert.equal(hooks.cycleOnly, true);
+      hooks.campaignState.sent++;
+      return { sent: hooks.campaignState.sent, halted: false };
+    },
+  });
+  try {
+    input.write(JSON.stringify({ directory: 'test', profiles: [{ id: '1', proxy: '' }, { id: '2', proxy: '' }], run: { runId: 'shared', config: {} } }) + '\n');
+    await waitFor(() => entries.filter(e => e.status === 'open').length === 2);
+    input.write(JSON.stringify({ command: 'check', requestId: 'ready' }) + '\n');
+    await waitFor(() => entries.filter(e => e.status === 'ready').length === 2);
+    const request = { command: 'campaign', runId: 'shared', token: 'fake', mailboxes: { 1: 'one@example.com', 2: 'two@example.com' },
+      automation: { maxPerProfile: 1, afterQueue: 'finish' }, parserRequest: {},
+      parserBatch: { run_id: 'shared', received: 2, batches: [{ profile_id: '1', ads: [{}] }, { profile_id: '2', ads: [{}] }] } };
+    input.write(JSON.stringify(request) + '\n');
+    input.write(JSON.stringify(request) + '\n');
+    await waitFor(() => exited);
+    assert.ok(contexts.every(c => c.closed));
+    assert.deepEqual(entries.filter(e => e.phase === 'complete').map(e => [e.id, e.sent]).sort(), [['1', 1], ['2', 1]]);
+  } finally { await worker.stop(); input.destroy(); }
+});
+
 test('manual browser closure preserves other profiles and allows relaunch of the same sessions', { timeout: 60000 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), 'luxury-manual-close-'));
   const contexts = [];

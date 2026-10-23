@@ -36,7 +36,7 @@ export function AutomationPage() {
         <Panel className="automation-card">
           <div className="settings-card-heading"><span className="settings-heading-icon"><Clock3 size={18} /></span><div><h2>Темп отправки</h2><p>Паузы и ограничения для каждого профиля</p></div></div>
           <div className="automation-fields">
-            {field("maxPerProfile", "Лимит писем на профиль за запуск", "0 — отправить все объявления из очереди", "писем")}
+            {field("maxPerProfile", "Лимит писем на профиль за запуск", "Общий лимит на все циклы; 0 — до исчерпания объявлений", "писем")}
             {field("pauseEverySent", "Пауза после серии писем", "После скольких отправок делать перерыв; 0 — отключить", "писем")}
             {field("delayMinSeconds", "Задержка между письмами: от", "Минимальная пауза перед следующим письмом", "сек.")}
             {field("delayMaxSeconds", "Задержка между письмами: до", "Максимальная пауза; время выбирается в этом диапазоне", "сек.")}
@@ -46,7 +46,7 @@ export function AutomationPage() {
         <Panel className="automation-card">
           <div className="settings-card-heading"><span className="settings-heading-icon"><MailCheck size={18} /></span><div><h2>Проверка входящих</h2><p>Во время отправки и после достижения лимита</p></div></div>
           <div className="automation-fields">
-            {field("checkEverySent", "Проверять входящие каждые N отправок", "Проверка между письмами; 0 — отключить", "писем")}
+            {field("checkEverySent", "Проверять входящие каждые N отправок", "Размер цикла на профиль; после цикла — проверка. 0 — без проверок, партии по 10", "писем")}
             {field("checkEverySeconds", "Проверять входящие каждые N секунд", value.afterQueue === "finish" ? "Недоступно: выбрано «Завершить работу». Выберите продолжение проверок после очереди." : "Включается после достижения лимита отправок или завершения очереди", "сек.", value.afterQueue === "finish")}
             <div className="automation-field automation-wide"><span>После завершения очереди</span><small>Действие после отправки всех писем или достижения лимита</small><CustomSelect ariaLabel="После завершения очереди" className="automation-select" disabled={!ready} value={value.afterQueue} onChange={afterQueue => update({ ...value, afterQueue: afterQueue as AutomationSettings["afterQueue"] })} options={[{ value: "finish", label: "Завершить работу" }, { value: "monitor", label: "Продолжить проверять входящие" }]} /></div>
           </div>

@@ -240,7 +240,7 @@ export function OverviewPage() {
             setLogs(current => [{ time: currentTime(), message: `INFO Ответ @vvsparserbot — ${result.returned === undefined ? "" : `объявлений: ${result.returned} шт.; `}с уникальными email: ${result.received} из ${result.requested} шт.${result.shortfall ? ` Не хватает: ${result.shortfall} шт.` : ""}`, kind: "system" }, ...current]);
             await invoke("store_parser_batch", { result });
             setLogs(current => [
-              ...result.batches.map(batch => ({ time: currentTime(), message: `Профиль ID ${batch.profile_id}: получено ${batch.ads.length} из 10 объявлений.`, kind: "system" as const })),
+              ...result.batches.map(batch => ({ time: currentTime(), message: `Профиль ID ${batch.profile_id}: получено ${batch.ads.length} из ${(prepared.request?.profile_limits as Record<string, number> | undefined)?.[batch.profile_id] ?? 10} объявлений.`, kind: "system" as const })),
               ...current,
             ]);
           } else {

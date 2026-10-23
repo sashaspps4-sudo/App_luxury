@@ -333,7 +333,7 @@ export async function recoverAfterUnknown(context, mailbox, isStopped) {
   if (await page.locator('[contenteditable="true"][g_editable="true"]').filter({ visible: true }).count()) throw new Error('Не закрыт редактор предыдущего письма. Черновик сохранён для проверки.');
 }
 
-export async function runCampaign(context, run, { profileId, mailbox, token, html, isStopped, emit, fetchImpl = fetch, sendImpl = sendOne, checkInboxImpl, automationClock = {} }) {
+export async function runCampaign(context, run, { profileId, mailbox, token, html, isStopped, emit, fetchImpl = fetch, sendImpl = sendOne, checkInboxImpl, automationClock = {}, campaignState, batchRunId, cycleOnly = false }) {
   const rendering = prepareRendering(run.config, html);
   const api = async (path, payload, timeout = 30000) => {
     let response;
@@ -343,16 +343,18 @@ export async function runCampaign(context, run, { profileId, mailbox, token, htm
     if (!response.ok) throw new SendError('api_rejected', typeof data.detail === 'string' ? data.detail : 'Сервер отклонил операцию отправки.');
     return data;
   };
-  const { jobs } = await api('/v1/outbound/prepare', { run_id: run.runId, profile_id: profileId, mailbox_email: mailbox, mode: rendering.mode, render_digest: rendering.renderDigest });
-  let sent = 0, uncertain = 0;
-  const scheduler = run.automation ? createAutomation(run.automation, {
+  const { jobs } = await api('/v1/outbound/prepare', { run_id: run.runId, ...(batchRunId ? { batch_run_id: batchRunId } : {}), profile_id: profileId, mailbox_email: mailbox, mode: rendering.mode, render_digest: rendering.renderDigest });
+  const progress = campaignState ?? { sent: 0, uncertain: 0 };
+  let sent = progress.sent, uncertain = progress.uncertain;
+  const scheduler = progress.scheduler ?? (run.automation ? createAutomation(run.automation, {
     checkInbox: async () => {
       const receipt = await (checkInboxImpl ? checkInboxImpl() : checkCampaignInbox(context, { profileId, mailbox, api, isStopped, emit }));
       await processReplies(context, { run, profileId, mailbox, api, html, isStopped, emit });
       return receipt;
     },
-    isStopped, emit: (level, message, extra = {}) => emit(level, message, { sent, ...extra }), ...automationClock,
-  }) : null;
+    isStopped, emit: (level, message, extra = {}) => emit(level, message, { sent: progress.sent, ...extra }), ...automationClock,
+  }) : null);
+  progress.scheduler = scheduler;
   const alreadySent = jobs.filter(job => job.status === 'sent').length;
   emit('info', `Очередь подготовлена: ${jobs.length}; отправлено ранее: ${alreadySent}.`, { sent });
   for (const job of jobs) {
@@ -424,7 +426,7 @@ export async function runCampaign(context, run, { profileId, mailbox, token, htm
         } catch (error) { acknowledgementError = error; }
       }
       if (!saved) throw acknowledgementError;
-      sent++;
+      sent++; progress.sent = sent;
       scheduler?.noteSent();
       emit('success', `Письмо успешно отправлено. Задание ${job.id}.`, { sent });
     } catch (error) {
@@ -442,11 +444,11 @@ export async function runCampaign(context, run, { profileId, mailbox, token, htm
         } catch { /* A missing durable outcome must halt rather than advance. */ }
         emit('error', `Задание ${job.id}: ${error instanceof SendError ? error.message : 'Ошибка работы с редактором Gmail.'} Статус: ${unknown ? 'unknown' : 'failed'}.`, { sent });
         if (code === 'send_unconfirmed' && unknown && recorded && !isStopped()) {
-          uncertain++;
+          uncertain++; progress.uncertain = uncertain;
           scheduler?.noteSent();
           emit('info', `Задание ${job.id} оставлено в unknown и повторно не отправляется. Продолжаем очередь.`, { sent });
           const hasNext = jobs.slice(jobs.indexOf(job) + 1).some(next => next.status === 'pending');
-          if (hasNext || scheduler?.config.afterQueue === 'monitor' || scheduler?.config.checkEverySent > 0) {
+          if (hasNext || cycleOnly || scheduler?.config.afterQueue === 'monitor' || scheduler?.config.checkEverySent > 0) {
             try { await recoverAfterUnknown(context, mailbox, isStopped); }
             catch (recoveryError) {
               emit('error', `Не удалось подготовить Gmail для следующего письма: ${recoveryError.message}`, { sent });
@@ -458,6 +460,15 @@ export async function runCampaign(context, run, { profileId, mailbox, token, htm
       }
       return { sent, halted: true };
     }
+  }
+  if (cycleOnly) {
+    try { if (scheduler?.config.checkEverySent) await scheduler.checkNow(); }
+    catch (error) {
+      if (!isStopped()) emit('error', `Проверка после цикла остановлена: ${error.message}`, { sent });
+      return { sent, halted: true, stopped: isStopped() };
+    }
+    emit('info', `Цикл завершён: всего за запуск подтверждено ${sent}; неподтверждено ${uncertain}.`, { sent });
+    return { sent, halted: false };
   }
   const remaining = jobs.filter(job => job.status === 'pending').length - sent - uncertain;
   const limitReached = !!scheduler?.config.maxPerProfile && sent + uncertain >= scheduler.config.maxPerProfile;

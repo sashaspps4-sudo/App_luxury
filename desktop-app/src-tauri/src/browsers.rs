@@ -5,7 +5,7 @@ use std::{
 };
 use tauri::{AppHandle, Manager, State};
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub struct BrowserProfile {
     id: String,
     proxy: String,
@@ -249,7 +249,7 @@ pub async fn start_browsers(
     let statuses = Arc::new(Mutex::new(profiles.iter().enumerate().map(|(index, p)| serde_json::json!({"index":index,"id":p.id,"status":"starting","message":""})).collect::<Vec<_>>()));
     *shared_statuses.lock().unwrap() = statuses.clone();
     *session.lock().unwrap() = Some(snapshot.clone());
-    for (index, profile) in profiles.iter().enumerate() {
+    {
     let node = if packaged_macos { macos_runtime.join("bin/node") } else { std::path::PathBuf::from("node") };
     let mut command = Command::new(node);
     if packaged_macos {
@@ -263,17 +263,17 @@ pub async fn start_browsers(
     let mut child = match command.spawn() {
         Ok(child) => child,
         Err(_) => {
-            statuses.lock().unwrap()[index]["status"] = "error".into();
-            statuses.lock().unwrap()[index]["message"] = if packaged_macos { "Не удалось запустить встроенный Node.js. Переустановите приложение для процессора вашего Mac." } else { "Не удалось запустить Node.js. Установите Node.js и перезапустите приложение." }.into();
-            continue;
-        }
+            for slot in statuses.lock().unwrap().iter_mut() { slot["status"] = "error".into(); }
+            stamp_session_end(&session, &statuses, snapshot["runId"].as_str().unwrap_or_default());
+            return Err("Не удалось запустить процесс браузеров. Проверьте Node.js.".into());
+        },
     };
-    let config = serde_json::json!({"profiles": [profile], "directory": directory, "run": snapshot});
+    let config = serde_json::json!({"profiles": profiles, "directory": directory, "run": snapshot});
     if writeln!(child.stdin.as_mut().unwrap(), "{config}").is_err() {
         let _ = child.kill(); let _ = child.wait();
-        statuses.lock().unwrap()[index]["status"] = "error".into();
-        statuses.lock().unwrap()[index]["message"] = "Не удалось передать параметры браузеру.".into();
-        continue;
+        for slot in statuses.lock().unwrap().iter_mut() { slot["status"] = "error".into(); }
+        stamp_session_end(&session, &statuses, snapshot["runId"].as_str().unwrap_or_default());
+        return Err("Не удалось передать параметры браузерам.".into());
     }
     // Each reader owns its session's statuses, so a late EOF from an old worker
     // cannot overwrite the statuses of a new launch.
@@ -281,13 +281,14 @@ pub async fn start_browsers(
     let inbox_results = inbox_results.clone();
     let campaign_events = campaign_events.clone();
     let reader_session = session.clone();
-    let profile_id = profile.id.clone();
+    let reader_profiles = profiles.clone();
     let run_id = snapshot["runId"].as_str().unwrap().to_string();
     let output = child.stdout.take().unwrap();
     std::thread::spawn(move || {
         for line in BufReader::new(output).lines().map_while(Result::ok) {
             if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&line) {
-                if value["id"].as_str() != Some(profile_id.as_str()) { continue; }
+                let Some(index) = reader_profiles.iter().position(|p| Some(p.id.as_str()) == value["id"].as_str()) else { continue; };
+                let profile_id = reader_profiles[index].id.clone();
                 if value["runId"].as_str() != Some(run_id.as_str()) { continue; }
                 if value["type"] == "inbox" {
                     inbox_results.lock().unwrap().insert(profile_id.clone(), value);
@@ -313,7 +314,7 @@ pub async fn start_browsers(
                 stamp_session_end(&reader_session, &statuses, &run_id);
             }
         }
-        if let Some(slot) = statuses.lock().unwrap().get_mut(index) {
+        for slot in statuses.lock().unwrap().iter_mut() {
             if slot["status"] != "closed" && slot["status"] != "error" {
                 slot["status"] = "error".into();
                 slot["message"] = "Процесс браузеров завершился. Проверьте зависимости browser-runtime.".into();
@@ -425,13 +426,13 @@ pub async fn start_campaign(app: AppHandle, state: State<'_, BrowserState>, run_
             else { html.unwrap_or_default() }
         };
         if content.trim().is_empty() || content.len() > 2_000_000 { return Err("HTML-шаблон пуст или превышает 2 МБ.".into()); }
-        let automation = super::automation_value(&app)?;
+        let automation = run["automation"].clone();
         let token = super::load_license_session(app)?.ok_or("Нет действующей локальной сессии лицензии.")?;
         let live = statuses.lock().map_err(|e| e.to_string())?;
         let opened: Vec<_> = live.iter().filter(|p| p["status"] != "closed" && p["status"] != "error").collect();
         if opened.is_empty() || opened.iter().any(|p| p["status"] != "ready") { return Err("Один из аккаунтов потерял готовность Gmail.".into()); }
         let mailboxes: serde_json::Map<String, serde_json::Value> = run["inboxSnapshots"].as_array().ok_or("Нет отпечатков входящих.")?.iter().filter_map(|p| Some((p["profile_id"].as_str()?.to_string(), p["mailbox_email"].clone()))).collect();
-        let request = serde_json::json!({"command":"campaign", "runId":run_id, "token":token, "mailboxes":mailboxes, "html":content, "automation":automation});
+        let request = serde_json::json!({"command":"campaign", "parserRequest":run["parserRequest"], "parserBatch":run["parserBatch"], "runId":run_id, "token":token, "mailboxes":mailboxes, "html":content, "automation":automation});
         // Set before the first dispatch: partial dispatch must never be replayed.
         run["campaignStarted"] = true.into();
         drop(live);
@@ -446,13 +447,20 @@ pub async fn start_campaign(app: AppHandle, state: State<'_, BrowserState>, run_
     }).await.map_err(|e| e.to_string())?
 }
 
+fn initial_cycle_quota(automation: &serde_json::Value) -> u64 {
+    let size = automation["checkEverySent"].as_u64().filter(|n| *n > 0).unwrap_or(10);
+    let limit = automation["maxPerProfile"].as_u64().unwrap_or(0);
+    if limit > 0 { size.min(limit) } else { size }
+}
+
 #[tauri::command]
 pub fn prepare_parser_batch(
+    app: AppHandle,
     state: State<BrowserState>,
     run_id: String,
 ) -> Result<serde_json::Value, String> {
-    let session = state.session.lock().map_err(|e| e.to_string())?;
-    let run = session.as_ref().ok_or("Нет активного запуска.")?;
+    let mut session = state.session.lock().map_err(|e| e.to_string())?;
+    let run = session.as_mut().ok_or("Нет активного запуска.")?;
     if run["runId"].as_str() != Some(run_id.as_str()) {
         return Err("Запуск изменился. Повторите проверку аккаунтов.".into());
     }
@@ -475,10 +483,16 @@ pub fn prepare_parser_batch(
     }
     let platform = config["serviceCode"].as_str().or(config["platform"].as_str()).unwrap_or("").to_ascii_lowercase();
     let ids: Vec<_> = opened.iter().map(|p| p["id"].clone()).collect();
-    Ok(serde_json::json!({"source": "parser", "request": {
+    let automation = super::automation_value(&app)?;
+    let quota = initial_cycle_quota(&automation);
+    let limits: serde_json::Map<String, serde_json::Value> = opened.iter().map(|p| (p["id"].as_str().unwrap().to_string(), quota.into())).collect();
+    let request = serde_json::json!({
         "run_id": run_id, "platform": platform, "profile_ids": ids,
-        "api_key": key, "countries": config["selectedGeos"], "filters": config["parserFilters"]
-    }}))
+        "api_key": key, "countries": config["selectedGeos"], "filters": config["parserFilters"], "profile_limits": limits
+    });
+    run["parserRequest"] = request.clone();
+    run["automation"] = automation;
+    Ok(serde_json::json!({"source": "parser", "request": request}))
 }
 
 #[tauri::command]
@@ -631,6 +645,13 @@ pub async fn check_accounts(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn first_parser_cycle_obeys_sending_interval_and_run_limit() {
+        for (interval, limit, expected) in [(10, 25, 10), (10, 5, 5), (10, 0, 10), (0, 25, 10), (0, 3, 3), (0, 0, 10), (25, 100, 25)] {
+            assert_eq!(super::initial_cycle_quota(&serde_json::json!({"checkEverySent": interval, "maxPerProfile": limit})), expected);
+        }
+    }
+
     #[test]
     fn session_end_waits_for_last_profile_and_ignores_old_runs() {
         let session = Arc::new(Mutex::new(Some(serde_json::json!({"runId":"current", "startedAtMs":1}))));

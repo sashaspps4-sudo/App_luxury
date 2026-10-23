@@ -151,6 +151,7 @@ export type ParserBatch = {
   requested: number;
   received: number;
   returned?: number;
+  empty_retries?: number;
   shortfall: number;
   batches: Array<{ profile_id: string; ads: Array<Record<string, unknown> & { email: string }> }>;
 };

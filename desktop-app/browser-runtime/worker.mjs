@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { captureInbox } from './inbox.mjs';
 import { runCampaign } from './sender.mjs';
+import { runCampaignCycles } from './campaign-cycles.mjs';
 
 export function parseProxy(value) {
   const raw = value.trim();
@@ -97,6 +98,7 @@ export function runWorker({ stdin = process.stdin, stdout = process.stdout, exit
   const lastStatus = new Map();
   let syncingInbox = false;
   let campaignTask;
+  const campaignAbort = new AbortController();
   let campaignStarted = false;
   const stoppedProfiles = new Set();
   async function stopProfile(index) {
@@ -108,6 +110,26 @@ export function runWorker({ stdin = process.stdin, stdout = process.stdout, exit
     if (campaignStarted || syncingInbox || stopping || request.runId !== runSnapshot?.runId) return;
     campaignStarted = true;
     runSnapshot.automation = request.automation ?? {};
+    if (request.parserRequest) {
+      const profiles = [...contexts].map(([index, context]) => ({
+        id: profileIds[index], context,
+        isStopped: () => stopping || stoppedProfiles.has(index) || contexts.get(index) !== context,
+        emit: (level, message, extra = {}) => stdout.write(`${JSON.stringify({ type: 'campaign', id: profileIds[index], index, runId: runSnapshot.runId, level, message, phase: 'running', ...extra })}\n`),
+        finish: async (sent, failed, stopped) => {
+          stdout.write(`${JSON.stringify({ type: 'campaign', id: profileIds[index], index, runId: runSnapshot.runId, level: failed ? 'error' : 'info', message: stopped ? 'Профиль остановлен пользователем.' : failed ? 'Рассылка профиля остановлена после ошибки.' : 'Обработка профиля завершена.', sent, phase: failed || stopped ? 'halted' : 'complete' })}\n`);
+          await stopProfile(index);
+        },
+      }));
+      for (const p of profiles) {
+        const index = profileIds.indexOf(p.id);
+        if (lastStatus.get(index) !== 'ready' || !request.mailboxes?.[p.id] || typeof request.token !== 'string') {
+          p.failed = true;
+          p.emit('error', 'Аккаунт Gmail или сессия лицензии не готовы.');
+        }
+      }
+      campaignTask = runCampaignCycles(runSnapshot, request, profiles, { sendCycle: runProfileCampaign, isStopped: () => stopping, signal: campaignAbort.signal });
+      return;
+    }
     campaignTask = Promise.all([...contexts].map(async ([index, context]) => {
       const emit = (level, message, extra = {}) => stdout.write(`${JSON.stringify({ type: 'campaign', id: profileIds[index], index, runId: runSnapshot.runId, level, message, phase: 'running', ...extra })}\n`);
       try {
@@ -163,6 +185,7 @@ export function runWorker({ stdin = process.stdin, stdout = process.stdout, exit
   function stop() {
     if (stopPromise) return stopPromise;
     stopping = true;
+    campaignAbort.abort();
     stopPromise = (async () => {
       await launchTask?.catch(() => {});
       await Promise.allSettled([...contexts.values()].map(context => context.close()));
