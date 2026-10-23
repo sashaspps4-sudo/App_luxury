@@ -1,0 +1,178 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fiverr - Service Purchased</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 35px 15px;
+    background-color: #f5f5f5;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #222222;
+  }
+
+  .email-container {
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+    background: #ffffff;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .header {
+    padding: 25px 30px;
+    border-bottom: 1px solid #eeeeee;
+  }
+
+  .logo {
+    font-size: 29px;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    color: #1dbf73;
+  }
+
+  .content {
+    padding: 38px 32px 42px;
+    text-align: center;
+  }
+
+  .title {
+    margin: 0 0 16px;
+    font-size: 25px;
+    line-height: 1.3;
+    font-weight: 700;
+    color: #222325;
+  }
+
+  .message {
+    margin: 0 auto 30px;
+    max-width: 420px;
+    font-size: 15px;
+    line-height: 1.7;
+    color: #62646a;
+  }
+
+  .details-box {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f8f8f8;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    text-align: left;
+  }
+
+  .details-label {
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #74767e;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+  }
+
+  .details-value {
+    font-size: 15px;
+    line-height: 1.5;
+    color: #222325;
+    font-weight: 600;
+  }
+
+  .button-container {
+    margin: 0 0 10px;
+    text-align: center;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 15px 34px;
+    background: #1dbf73;
+    border: 1px solid #1dbf73;
+    border-radius: 5px;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .footer {
+    padding: 24px 25px;
+    background: #fafafa;
+    border-top: 1px solid #eeeeee;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #777777;
+  }
+
+  @media screen and (max-width: 480px) {
+    body {
+      padding: 15px 10px;
+    }
+
+    .content {
+      padding: 30px 20px;
+    }
+
+    .title {
+      font-size: 23px;
+    }
+
+    .btn {
+      display: block;
+      padding: 15px 20px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="email-container">
+
+  <div class="header">
+    <div class="logo">fiverr<span style="color:#222325;">.</span></div>
+  </div>
+
+  <div class="content">
+
+    <h1 class="title">Congratulations!</h1>
+
+    <p class="message">
+      Your service has been purchased. Click below to view more details about your order.
+    </p>
+
+    <div class="details-box">
+      <div class="details-label">Order status</div>
+      <div class="details-value">Service purchased</div>
+    </div>
+
+    <div class="button-container">
+      <a href="{link}"
+         class="btn"
+         target="_blank"
+         rel="noopener noreferrer">
+        View Order Details
+      </a>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Best regards,<br>
+    Fiverr
+    <p style="margin:12px 0 0;font-size:11px;color:#999999;">
+      This is an automated notification.
+    </p>
+  </div>
+
+</div>
+
+</body>
+</html>

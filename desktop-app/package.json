@@ -1,0 +1,33 @@
+{
+  "name": "luxury-mailer-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 1420",
+    "build": "tsc && vite build",
+    "test:settings": "node --experimental-strip-types --test src/settingsModel.test.ts",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "browsers:setup": "npm install --prefix browser-runtime && npm run browsers:install",
+    "browsers:install": "node browser-runtime/node_modules/playwright/cli.js install chromium",
+    "macos:prepare": "node scripts/prepare-macos.mjs",
+    "macos:build": "node scripts/build-macos.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@fontsource/space-mono": "^5.3.0",
+    "@tauri-apps/api": "^2.0.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.3"
+  }
+}

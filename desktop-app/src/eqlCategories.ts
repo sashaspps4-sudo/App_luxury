@@ -1,0 +1,106 @@
+export const eqlCategories: Record<string, Record<string, string>> = {
+  "Vinted": {
+    "SE": "vinted_se",
+    "IT": "vinted_it",
+    "DK": "vinted_dk",
+    "HU": "vinted_hu",
+    "ES": "vinted_es",
+    "PT": "vinted_pt",
+    "DE": "vinted_de",
+    "NL": "vinted_nl",
+    "UK": "vinted_uk",
+    "FR": "vinted_fr",
+    "AT": "vinted_at",
+    "CZ": "vinted_cz",
+    "US": "vinted_us",
+    "BE": "vinted_be",
+    "HR": "vinted_hr",
+    "FI": "vinted_fi",
+    "GR": "vinted_gr",
+    "LT": "vinted_lt",
+    "LU": "vinted_lu",
+    "PL": "vinted_pl",
+    "RO": "vinted_ro",
+    "SK": "vinted_sk",
+    "EU": "vinted_eu",
+    "AU": "vinted_au"
+  },
+  "Poshmark": {
+    "US": "poshmark_us",
+    "CA": "poshmark_ca"
+  },
+  "Depop": {
+    "DE": "depop_de",
+    "AU": "depop_au",
+    "UK": "depop_uk",
+    "US": "depop_us",
+    "CA": "depop_ca",
+    "FR": "depop_fr",
+    "IT": "depop_it",
+    "IE": "depop_ie",
+    "NZ": "depop_nz"
+  },
+  "Etsy": {
+    "EU": "etsy_eu"
+  },
+  "Marktplaats": {
+    "NL": "marktplaats_nl"
+  },
+  "OLX": {
+    "RO": "olx_ro",
+    "PT": "olx_pt",
+    "PL": "olx_pl",
+    "BG": "olx_bg",
+    "BR": "olx_br",
+    "BA": "olx_ba"
+  },
+  "Kijiji": {
+    "CA": "kijiji_ca"
+  },
+  "Fiverr": {
+    "EU": "fiverr_eu"
+  },
+  "2dehands": {
+    "BE": "2dehands_be"
+  },
+  "Kleinanzeigen": {
+    "DE": "kleinanzeigen_de"
+  },
+  "Leboncoin": {
+    "FR": "leboncoin_fr"
+  },
+  "Subito": {
+    "IT": "subito_it"
+  },
+  "Carousell": {
+    "PH": "carousell_ph",
+    "SG": "carousell_sg",
+    "MY": "carousell_my",
+    "ID": "carousell_id",
+    "HK": "carousell_hk",
+    "TW": "carousell_tw",
+    "AU": "carousell_au",
+    "CA": "carousell_ca",
+    "NZ": "carousell_nz"
+  },
+  "OfferUp": {
+    "US": "offerup_us"
+  },
+  "Wallapop": {
+    "ES": "wallapop_es",
+    "IT": "wallapop_it",
+    "PT": "wallapop_pt",
+    "FR": "wallapop_fr",
+    "UK": "wallapop_uk"
+  },
+  "Gumtree": {
+    "AU": "gumtree_au",
+    "UK": "gumtree_uk",
+    "ZA": "gumtree_za"
+  }
+};
+
+export function eqlGeoAllowed(platform: string, geo: string): boolean {
+  const categories = eqlCategories[platform] ?? {};
+  return Boolean(categories[geo === "GB" ? "UK" : geo.toUpperCase() === "ALL" ? "EU" : geo.toUpperCase()]);
+}

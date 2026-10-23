@@ -1,0 +1,177 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Etsy - You made a sale</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #222222;
+    }
+
+    .wrapper {
+      width: 100%;
+      padding: 30px 12px;
+      box-sizing: border-box;
+    }
+
+    .container {
+      max-width: 560px;
+      width: 100%;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .header {
+      background-color: #f1641e;
+      padding: 22px 30px;
+    }
+
+    .logo {
+      color: #ffffff;
+      font-family: Georgia, serif;
+      font-size: 30px;
+      font-weight: bold;
+    }
+
+    .content {
+      padding: 32px 30px;
+    }
+
+    .title {
+      margin-bottom: 24px;
+      font-size: 25px;
+      font-weight: bold;
+      line-height: 1.3;
+      color: #222222;
+    }
+
+    .details-box {
+      padding: 22px;
+      background-color: #fafafa;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+    }
+
+    .label {
+      margin-top: 18px;
+      margin-bottom: 5px;
+      font-size: 13px;
+      color: #666666;
+    }
+
+    .label:first-child {
+      margin-top: 0;
+    }
+
+    .value {
+      font-size: 16px;
+      font-weight: bold;
+      line-height: 1.5;
+      color: #222222;
+      overflow-wrap: anywhere;
+    }
+
+    .button-container {
+      margin-top: 28px;
+      text-align: center;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 15px 24px;
+      background-color: #f1641e;
+      color: #ffffff;
+      border-radius: 4px;
+      font-size: 15px;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .footer {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 22px 20px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #666666;
+    }
+
+    @media screen and (max-width: 480px) {
+      .content {
+        padding: 26px 20px;
+      }
+
+      .header {
+        padding: 20px;
+      }
+
+      .title {
+        font-size: 23px;
+      }
+
+      .details-box {
+        padding: 18px;
+      }
+
+      .btn {
+        display: block;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wrapper">
+    <div class="container">
+
+      <div class="header">
+        <div class="logo">Etsy</div>
+      </div>
+
+      <div class="content">
+
+        <div class="title">You made a sale</div>
+
+        <div class="details-box">
+
+          <div class="label">Order Number</div>
+          <div class="value">#28501341</div>
+
+          <div class="label">Product</div>
+          <div class="value">{item}</div>
+
+          <div class="label">Amount</div>
+          <div class="value">{price}</div>
+
+          <div class="label">Date</div>
+          <div class="value">{data}</div>
+
+        </div>
+
+<div class="button-container">
+  <a href="{link}"
+     class="btn"
+     target="_blank">
+    View Order Details
+  </a>
+</div>
+
+      </div>
+    </div>
+
+    <div class="footer">
+      Sent via Etsy Ireland UC. All rights reserved.
+    </div>
+  </div>
+
+</body>
+</html>

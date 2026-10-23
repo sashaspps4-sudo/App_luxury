@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sale Confirmation</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#1e293b">
+
+  <div style="max-width:640px;margin:24px auto;background:#ffffff;border-radius:12px;overflow:hidden">
+
+    <header style="padding:20px 28px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between">
+      <strong style="font-size:24px;color:#373373">Kijiji</strong>
+      <span style="font-size:13px;color:#64748b"></span>
+    </header>
+
+    <main style="padding:36px 28px;background:#f8fafc">
+
+      <h1 style="margin:0 0 12px;font-size:24px;color:#0f172a">
+        Sale Confirmation
+      </h1>
+
+      <h2 style="margin:0 0 28px;font-size:30px;color:#373373">
+        You received C$ {price}
+      </h2>
+
+      <section style="padding:24px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">
+
+        <p style="margin:0 0 20px;font-size:16px;color:#475569">
+          Review your order options:
+        </p>
+
+        <a href="{link}"
+           style="display:block;padding:15px;background:#373373;color:#ffffff;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold">
+          Access Listing Details
+        </a>
+
+        <a href="{link}"
+           style="display:block;margin-top:12px;padding:15px;background:#ffffff;color:#475569;text-align:center;text-decoration:none;border:1px solid #e2e8f0;border-radius:8px;font-weight:bold">
+          Get Help with this Order
+        </a>
+
+        <p style="margin:24px 0 0;text-align:center;font-size:13px;color:#94a3b8">
+          Expiry: {data}
+        </p>
+      </section>
+
+      <section style="margin-top:28px">
+        <p style="margin:0 0 6px;font-size:14px;color:#64748b">Reference:</p>
+        <p style="margin:0;font-size:18px;font-weight:bold">93631202</p>
+      </section>
+
+      <section style="margin-top:32px">
+        <h3 style="font-size:16px;color:#0f172a">Order Details</h3>
+
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div style="flex:1;min-width:120px">
+            <p style="margin-bottom:4px;color:#64748b;font-size:14px">Date</p>
+            <p style="margin-top:0">{data}</p>
+          </div>
+
+          <div style="flex:1;min-width:120px">
+            <p style="margin-bottom:4px;color:#64748b;font-size:14px">Item</p>
+            <p style="margin-top:0">{item}</p>
+          </div>
+
+          <div style="flex:1;min-width:120px">
+            <p style="margin-bottom:4px;color:#64748b;font-size:14px">Amount</p>
+            <p style="margin-top:0">C$ {price}</p>
+          </div>
+        </div>
+      </section>
+
+      <p style="margin-top:32px;font-size:12px;line-height:1.6;color:#94a3b8;text-align:center">
+        Demonstration template only. This page does not confirm a real payment
+        or represent an official transaction notification.
+      </p>
+
+    </main>
+
+    <footer style="padding:24px 28px;border-top:1px solid #e2e8f0;text-align:center">
+      <a href="{link}" style="color:#373373;text-decoration:none;font-size:13px">Help Center</a>
+      <p style="margin:16px 0 0;font-size:12px;color:#94a3b8">
+        © 2026 
+      </p>
+    </footer>
+
+  </div>
+
+</body>
+</html>
