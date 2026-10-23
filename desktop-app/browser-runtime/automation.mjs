@@ -87,7 +87,7 @@ export function createAutomation(settings, { checkInbox, isStopped, emit, now = 
       if (config.afterQueue !== 'monitor') return;
       monitoring = true;
       lastCheck = now();
-      emit('info', 'Очередь завершена. Продолжаем проверять входящие.', { phase: 'monitoring' });
+      emit('info', `Отправка завершена. Продолжаем проверять входящие каждые ${config.checkEverySeconds} сек.`, { phase: 'monitoring' });
       while (!isStopped()) { await waitUntil(lastCheck + interval); await check(); }
       stopped();
     },

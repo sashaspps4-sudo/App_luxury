@@ -446,7 +446,7 @@ export async function runCampaign(context, run, { profileId, mailbox, token, htm
           scheduler?.noteSent();
           emit('info', `Задание ${job.id} оставлено в unknown и повторно не отправляется. Продолжаем очередь.`, { sent });
           const hasNext = jobs.slice(jobs.indexOf(job) + 1).some(next => next.status === 'pending');
-          if (hasNext || scheduler?.config.afterQueue === 'monitor') {
+          if (hasNext || scheduler?.config.afterQueue === 'monitor' || scheduler?.config.checkEverySent > 0) {
             try { await recoverAfterUnknown(context, mailbox, isStopped); }
             catch (recoveryError) {
               emit('error', `Не удалось подготовить Gmail для следующего письма: ${recoveryError.message}`, { sent });
@@ -459,6 +459,11 @@ export async function runCampaign(context, run, { profileId, mailbox, token, htm
       return { sent, halted: true };
     }
   }
+  const remaining = jobs.filter(job => job.status === 'pending').length - sent - uncertain;
+  const limitReached = !!scheduler?.config.maxPerProfile && sent + uncertain >= scheduler.config.maxPerProfile;
+  emit('info', limitReached
+    ? `Отправка завершена: достигнут лимит профиля ${scheduler.config.maxPerProfile}; подтверждено ${sent}, неподтверждено ${uncertain}; осталось в очереди ${Math.max(0, remaining)}.`
+    : `Отправка завершена: очередь исчерпана; подтверждено ${sent}, неподтверждено ${uncertain}. Новые объявления автоматически не загружаются.`, { sent });
   try { await scheduler?.finish(); }
   catch (error) {
     if (!isStopped()) emit('error', `Автоматизация остановлена: ${error.message}`, { sent });

@@ -113,3 +113,30 @@ test('monitoring skips exhausted transient capture but keeps its next scheduled 
   assert.equal(checks, 2); assert.equal(time, 4000);
   assert.ok(events.some(event => event[0] === 'error' && event[1].includes('следующая — по расписанию')));
 });
+
+test('checks after 10 sends resume the queue; timed monitoring starts only after queue or limit', async () => {
+  for (const [count, limit, mode, expected] of [[25, 30, 'monitor', 25], [25, 20, 'monitor', 20], [10, 30, 'monitor', 10], [25, 30, 'finish', 25]]) {
+    let sent = 0, time = 0, stopped = false;
+    const checks = [], events = [];
+    const result = await runCampaign({ pages: () => [{ isClosed: () => false, url: () => 'https://mail.google.com/mail/u/0/' }] }, {
+      runId: 'test', automation: { maxPerProfile: limit, checkEverySent: 10, checkEverySeconds: 2, afterQueue: mode, delayMinSeconds: 3, delayMaxSeconds: 3 },
+      config: { workflowMode: 'funnel', subjectLines: 'Subject', serviceCode: 'Depop', templates: { Depop: 'Body' } },
+    }, {
+      profileId: '1', mailbox: 'owner@example.com', token: 'fake', html: '<p>Reply</p>', isStopped: () => stopped,
+      emit: (_level, message) => events.push(message),
+      automationClock: { now: () => time, sleep: async ms => { time += ms; } },
+      checkInboxImpl: async () => { checks.push(sent); if (events.some(message => message.includes('каждые 2 сек.'))) stopped = true; return {}; },
+      fetchImpl: async (url, init) => {
+        if (url.includes('/replies/candidates?')) return new Response(JSON.stringify({ items: [] }));
+        if (url.endsWith('/prepare')) return new Response(JSON.stringify({ jobs: Array.from({ length: count }, (_, i) => ({ id: i + 1, ordinal: i, recipient: 'seller@example.com', ad: {}, status: 'pending' })) }));
+        if (url.endsWith('/claim')) return new Response(JSON.stringify({ status: 'sending' }));
+        return new Response(JSON.stringify({ status: JSON.parse(init.body).status }));
+      },
+      sendImpl: async (_page, _job, _body, hooks) => { await hooks.claim({}); sent++; return { draft_ref: '#msg-a:test', thread_ref: '#thread-a:test' }; },
+    });
+    assert.equal(result.sent, expected);
+    assert.deepEqual(checks, [...Array.from({ length: Math.floor(expected / 10) }, (_, i) => (i + 1) * 10), ...(mode === 'monitor' ? [expected] : [])]);
+    assert.ok(events.some(message => message.includes(expected >= limit ? 'достигнут лимит профиля' : 'очередь исчерпана')));
+    assert.equal(events.some(message => message.includes('каждые 2 сек.')), mode === 'monitor');
+  }
+});
