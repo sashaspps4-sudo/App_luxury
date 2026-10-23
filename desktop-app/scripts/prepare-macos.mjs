@@ -17,6 +17,13 @@ export function run(command, args, options = {}) {
   if (result.status !== 0) throw new Error(`${command} завершился с ошибкой ${result.status}.`);
 }
 
+export function verifyMacArchitecture(binary, architecture, execute = run) {
+  if (!['arm64', 'x86_64'].includes(architecture)) throw new Error('Unsupported macOS binary architecture.');
+  // lipo consumes every argument after -verify_arch as an architecture name.
+  // Its input filename must therefore precede the command and its varargs.
+  execute('/usr/bin/lipo', [binary, '-verify_arch', architecture]);
+}
+
 async function resetStage(stage) {
   const parent = await realpath(join(appRoot, 'src-tauri'));
   if (resolve(stage) !== join(parent, 'macos-runtime')) throw new Error('Некорректная папка подготовки.');
@@ -48,7 +55,7 @@ export async function prepareMacos(requested) {
   const node = join(bin, 'node');
   await copyFile(await realpath(process.execPath), node);
   await chmod(node, 0o755);
-  run('/usr/bin/lipo', ['-verify_arch', hostArch, node]);
+  verifyMacArchitecture(node, hostArch);
   const dylibs = spawnSync('/usr/bin/otool', ['-L', node], { encoding: 'utf8' });
   if (dylibs.status !== 0 || dylibs.stdout.split('\n').slice(1).some(line => line.trim() && !/^\s*\/(usr\/lib|System\/Library)\//.test(line))) throw new Error('Нужен самостоятельный Node.js с nodejs.org или actions/setup-node, без Homebrew dylib-зависимостей.');
   run('npm', ['ci', '--omit=dev', '--ignore-scripts'], { cwd: runtime });
@@ -56,7 +63,7 @@ export async function prepareMacos(requested) {
   run(node, [join(runtime, 'node_modules/playwright/cli.js'), 'install', 'chromium'], { cwd: runtime, env });
   const browserPath = spawnSync(node, ['--input-type=module', '-e', "import {chromium} from 'playwright'; console.log(chromium.executablePath());"], { cwd: runtime, env, encoding: 'utf8' });
   if (browserPath.status !== 0 || !browserPath.stdout.trim()) throw new Error('Не найден встроенный Chromium.');
-  run('/usr/bin/lipo', ['-verify_arch', hostArch, browserPath.stdout.trim()]);
+  verifyMacArchitecture(browserPath.stdout.trim(), hostArch);
 
   const python = process.env.LUXURY_BUILD_PYTHON || 'python3';
   const pythonArch = spawnSync(python, ['-c', 'import platform; print(platform.machine())'], { encoding: 'utf8' });
@@ -70,7 +77,7 @@ export async function prepareMacos(requested) {
     '--distpath', bin, '--workpath', join(build, 'work'), '--specpath', build, '--paths', providers,
     '--hidden-import', 'eql', '--hidden-import', 'kartatai', '--add-data', join(providers, 'eql_categories.json') + ':.', join(providers, 'generate_link.py')]);
   run(join(bin, 'luxury-link'), ['--self-test']);
-  run('/usr/bin/lipo', ['-verify_arch', hostArch, join(bin, 'luxury-link')]);
+  verifyMacArchitecture(join(bin, 'luxury-link'), hostArch);
 
   const iconset = join(build, 'Luxury.iconset');
   await mkdir(iconset, { recursive: true });
