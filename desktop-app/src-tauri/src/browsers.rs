@@ -431,6 +431,7 @@ pub async fn start_campaign(app: AppHandle, state: State<'_, BrowserState>, run_
         let live = statuses.lock().map_err(|e| e.to_string())?;
         let opened: Vec<_> = live.iter().filter(|p| p["status"] != "closed" && p["status"] != "error").collect();
         if opened.is_empty() || opened.iter().any(|p| p["status"] != "ready") { return Err("Один из аккаунтов потерял готовность Gmail.".into()); }
+        validate_distinct_mailboxes(&run["inboxSnapshots"])?;
         let mailboxes: serde_json::Map<String, serde_json::Value> = run["inboxSnapshots"].as_array().ok_or("Нет отпечатков входящих.")?.iter().filter_map(|p| Some((p["profile_id"].as_str()?.to_string(), p["mailbox_email"].clone()))).collect();
         let request = serde_json::json!({"command":"campaign", "parserRequest":run["parserRequest"], "parserBatch":run["parserBatch"], "runId":run_id, "token":token, "mailboxes":mailboxes, "html":content, "automation":automation});
         // Set before the first dispatch: partial dispatch must never be replayed.
@@ -568,6 +569,18 @@ pub async fn sync_inboxes(state: State<'_, BrowserState>, run_id: String) -> Res
     }).await.map_err(|e| e.to_string())?
 }
 
+fn validate_distinct_mailboxes(snapshots: &serde_json::Value) -> Result<(), String> {
+    let entries = snapshots.as_array().ok_or("Нет подтверждённых почтовых аккаунтов.")?;
+    if entries.is_empty() { return Err("Нет подтверждённых почтовых аккаунтов.".into()); }
+    let mut seen = std::collections::HashSet::new();
+    for entry in entries {
+        let mailbox = entry["mailbox_email"].as_str().unwrap_or("").trim().to_lowercase();
+        if mailbox.is_empty() { return Err("Не определён почтовый аккаунт профиля.".into()); }
+        if !seen.insert(mailbox) { return Err("В нескольких профилях открыт один и тот же Gmail. Используйте разные почтовые аккаунты.".into()); }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn confirm_inbox_baseline(state: State<BrowserState>, run_id: String) -> Result<(), String> {
     let mut session = state.session.lock().map_err(|e| e.to_string())?;
@@ -575,6 +588,7 @@ pub fn confirm_inbox_baseline(state: State<BrowserState>, run_id: String) -> Res
     if run["runId"].as_str() != Some(run_id.as_str()) || !run["inboxSnapshots"].is_array() {
         return Err("Отпечаток не соответствует текущему запуску.".into());
     }
+    validate_distinct_mailboxes(&run["inboxSnapshots"])?;
     run["inboxSynced"] = true.into();
     Ok(())
 }
@@ -645,6 +659,14 @@ pub async fn check_accounts(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn concurrent_profiles_require_distinct_confirmed_mailboxes() {
+        assert!(super::validate_distinct_mailboxes(&serde_json::json!([{"mailbox_email":"one@example.com"},{"mailbox_email":"two@example.com"}])).is_ok());
+        assert!(super::validate_distinct_mailboxes(&serde_json::json!([{"mailbox_email":"One@example.com"},{"mailbox_email":" one@example.com "}])).is_err());
+        assert!(super::validate_distinct_mailboxes(&serde_json::json!([{}])).is_err());
+        assert!(super::validate_distinct_mailboxes(&serde_json::json!([])).is_err());
+    }
+
     #[test]
     fn first_parser_cycle_obeys_sending_interval_and_run_limit() {
         for (interval, limit, expected) in [(10, 25, 10), (10, 5, 5), (10, 0, 10), (0, 25, 10), (0, 3, 3), (0, 0, 10), (25, 100, 25)] {

@@ -66,7 +66,7 @@ export function OverviewPage() {
         if (!hasOpen) setLaunchStage("idle");
         if (campaignActive) setLaunchStage("running");
         else if (run && next.some(item => item.status === "ready") && next.every(item => ["ready", "closed", "error"].includes(item.status))) {
-          setLaunchStage(run.parserComplete ? "running" : "preparing");
+          setLaunchStage(run.campaignStarted ? "running" : "preparing");
         }
         if (JSON.stringify(next) === previous) return;
         previous = JSON.stringify(next);
@@ -263,6 +263,7 @@ export function OverviewPage() {
         if (!selectedConfig || configError) throw new Error("Выберите доступный конфиг рассылки.");
         const saved = await loadSettingsStore();
         if (!saved.configs[selectedConfig]) throw new Error("Выбранный конфиг удалён. Выберите другой.");
+        if (saved.configs[selectedConfig].databaseSource === "custom") throw new Error("Отправка собственной базы пока не подключена. Выберите базу парсера перед запуском браузеров.");
         // Materialize the default config too; the native side captures this file.
         await saveSettingsStore({ ...saved, selectedConfig });
         await saveProfiles(store);

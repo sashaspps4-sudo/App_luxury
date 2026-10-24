@@ -39,3 +39,9 @@ initial/subsequent batches, monitoring enabled/disabled, unknown outcomes, fresh
 run counters, stop during a parser request, cross-cycle mailbox binding, dedup,
 parser idempotency, and exclusive outbound claims. Tests use synthetic mail;
 they do not send real Gmail messages or consume a paid parser key.
+
+Concurrent profiles must use distinct confirmed Gmail accounts; duplicates are
+rejected before parsing/sending. Quotas are recalculated after the shared parser
+cooldown, since a browser can close while waiting. Reply candidate pagination is
+filtered by profile and mailbox on the server, rather than downloading every
+profile's queue into every worker.

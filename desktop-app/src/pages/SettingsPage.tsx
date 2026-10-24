@@ -366,6 +366,7 @@ export function SettingsPage() {
           </div>
 
           {provider === "custom" ? <div className="custom-provider-fields">
+            <p>Сохранение настроек доступно. Создание ссылок через свой API пока не подключено; для рассылки используйте EQL или Kartatai.</p>
             <div className="custom-provider-row">
               <label className="credential-field">
                 <span>ENDPOINT URL / ДОМЕН</span>
@@ -393,7 +394,7 @@ export function SettingsPage() {
               <div className="json-editor"><Braces size={17} /><textarea value={requestBody} onChange={(event) => { setRequestBody(event.target.value); setCustomCheckStatus("idle"); }} placeholder={'{\n  "prompt": "{{message}}"\n}'} spellCheck="false" /></div>
             </label>
             <div className="custom-check-row">
-              {customCheckStatus === "valid" && <span className="custom-check-status valid"><CircleCheck size={14} /> Конфигурация корректна</span>}
+              {customCheckStatus === "valid" && <span className="custom-check-status valid"><CircleCheck size={14} /> Формат URL и JSON корректен</span>}
               {customCheckStatus === "invalid" && <span className="custom-check-status invalid"><CircleAlert size={14} /> Проверьте URL и JSON</span>}
               <GlassButton className="custom-check-button" onClick={checkCustomProvider}>ПРОВЕРИТЬ</GlassButton>
             </div>

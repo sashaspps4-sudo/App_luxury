@@ -118,7 +118,7 @@ export async function processReplies(context, { run, profileId, mailbox, api, ht
   if (!html?.trim()) throw new Error('Для автоответов нужен HTML-шаблон.');
   let after = 0;
   while (!isStopped()) {
-    const list = await api(`/v1/replies/candidates?eligible=true&limit=50&after_id=${after}`);
+    const list = await api(`/v1/replies/candidates?eligible=true&limit=50&profile_id=${encodeURIComponent(profileId)}&mailbox_email=${encodeURIComponent(mailbox)}&after_id=${after}`);
     if (!list.items.length) return;
     for (const item of list.items) {
       after = item.id;

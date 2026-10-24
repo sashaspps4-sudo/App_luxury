@@ -45,11 +45,16 @@ export async function runCampaignCycles(run, request, profiles, {
   };
   const retired = [];
   try {
+    const mailboxes = profiles.filter(p => !p.failed && !p.isStopped()).map(p => String(request.mailboxes?.[p.id] ?? '').trim().toLowerCase());
+    if (mailboxes.some(mailbox => !mailbox) || new Set(mailboxes).size !== mailboxes.length) throw new Error('Профилям нужны разные подтверждённые почтовые аккаунты.');
     while (!isStopped()) {
-      const quotas = cycleQuotas(profiles, automation);
+      let quotas = cycleQuotas(profiles, automation);
       if (!Object.keys(quotas).length) break;
       if (round > 0) {
         await pause(Math.max(0, 5100 - (now() - lastRequest)));
+        // A profile can close while waiting for the shared parser cooldown.
+        quotas = cycleQuotas(profiles, automation);
+        if (!Object.keys(quotas).length) break;
         const payload = { ...request.parserRequest, run_id: `cycle-${randomUUID()}`, parent_run_id: run.runId,
           profile_ids: Object.keys(quotas).sort((a, b) => {
             const total = id => { const p = profiles.find(p => p.id === id); return p.state.sent + p.state.uncertain; };

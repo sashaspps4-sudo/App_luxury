@@ -83,7 +83,7 @@ export function AnalyticsPage() {
 
   return <>
     <section className="page-heading analytics-heading">
-      <div><p className="kicker">ОТПРАВКИ / ОТВЕТЫ / ВОРОНКИ</p><h1>Аналитика <span>рассылок</span></h1><p>Смотрите, сколько сообщений отправлено и какие ответы они принесли.</p></div>
+      <div><p className="kicker">ОТПРАВКИ / ОТВЕТЫ / ВОРОНКИ</p><h1>Аналитика <span>рассылок</span></h1><p>Раздел пока показывает демонстрационные данные. Реальные счётчики доступны в обзоре.</p></div>
     </section>
 
     <div className="analytics-filters panel-surface">
@@ -96,7 +96,7 @@ export function AnalyticsPage() {
     <section className="analytics-stats">
       <article className="analytics-stat"><div><span>ОТПРАВЛЕНО</span><Send size={15} /></div><strong>{sent.toLocaleString("ru-RU")}</strong><small><i className="stat-trend"><ArrowUpRight size={12} /> 12%</i> к прошлой неделе</small></article>
       <article className="analytics-stat"><div><span>ПОЛУЧЕНО ОТВЕТОВ</span><MessageSquareReply size={15} /></div><strong>{replies.toLocaleString("ru-RU")}</strong><small>Ответили на ваши сообщения</small></article>
-      <article className="analytics-stat"><div><span>ОТПРАВЛЕНО АВТООТВЕТОВ</span><Bot size={15} /></div><strong>{receivedAutoReplies.toLocaleString("ru-RU")}</strong><small>Отправленные автоматические ответы</small></article>
+      <article className="analytics-stat"><div><span>ОТПРАВЛЕНО АВТООТВЕТОВ</span><Bot size={15} /></div><strong>{sentAutoReplies.toLocaleString("ru-RU")}</strong><small>Отправленные автоматические ответы</small></article>
       <article className="analytics-stat"><div><span>ДОЛЯ ОТВЕТОВ</span><Activity size={15} /></div><strong>{replyRate}<em>%</em></strong><small>Ответы от числа отправок</small></article>
     </section>
 

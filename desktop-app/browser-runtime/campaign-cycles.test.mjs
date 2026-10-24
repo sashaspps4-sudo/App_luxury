@@ -8,8 +8,8 @@ async function scenario({ count = 5, limit = 25, shortFirst, emptyNext = false, 
   const automation = { maxPerProfile: limit, checkEverySent: interval, checkEverySeconds: 2,
     afterQueue: monitor ? 'monitor' : 'finish', delayMinSeconds: 3, delayMaxSeconds: 3, pauseEverySent: 12, pauseSeconds: 4 };
   const profiles = Array.from({ length: count }, (_, i) => {
-    const p = { id: String(i + 1), closed: false, failed: false, events: [], checks: 0, timed: 0, reloads: 0 };
-    p.context = { pages: () => [{ isClosed: () => false, url: () => 'https://mail.google.com/mail/u/0/', reload: async () => { p.reloads++; }, waitForFunction: async () => {}, evaluate: async () => 'owner@example.com', locator: () => ({ filter() { return this; }, count: async () => 0 }) }] };
+    const p = { id: String(i + 1), closed: false, failed: false, events: [], checks: 0, timed: 0, reloads: 0, mailbox: `owner${i + 1}@example.com` };
+    p.context = { pages: () => [{ isClosed: () => false, url: () => 'https://mail.google.com/mail/u/0/', reload: async () => { p.reloads++; }, waitForFunction: async () => {}, evaluate: async () => p.mailbox, locator: () => ({ filter() { return this; }, count: async () => 0 }) }] };
     p.isStopped = () => p.closed || p.timed > 0;
     p.emit = (_level, message, extra) => { p.events.push(message); if (extra?.phase === 'monitoring' && message.includes('проверяем входящие')) p.timed++; };
     p.finish = async (sent, failed) => { p.closed = true; p.final = { sent, failed }; };
@@ -60,7 +60,7 @@ async function scenario({ count = 5, limit = 25, shortFirst, emptyNext = false, 
   profiles.forEach(p => p.hooks.fetchImpl = fetchImpl);
   await runCampaignCycles({ runId: 'root', config: { workflowMode: 'funnel', subjectLines: 'Subject', serviceCode: 'Depop', templates: { Depop: 'Body' } } }, {
     automation, parserBatch: first, parserRequest: { platform: 'depop', api_key: 'fake' }, token: 'fake', html: '<p>Reply</p>',
-    mailboxes: Object.fromEntries(profiles.map(p => [p.id, 'owner@example.com'])),
+    mailboxes: Object.fromEntries(profiles.map(p => [p.id, p.mailbox])),
   }, profiles, { fetchImpl, now: () => time, sleep: async ms => { time += ms; } });
   return { profiles, requests, sends, sequence };
 }
@@ -158,4 +158,75 @@ test('a failed profile is excluded from subsequent requests while healthy profil
   assert.deepEqual(requests[0].profile_ids, ['2', '3']);
   assert.deepEqual(requests[0].profile_limits, { 2: 2, 3: 2 });
   assert.ok(profiles.slice(1).every(p => p.final.sent === 12 && !p.final.failed));
+});
+
+test('20 concurrent profile cycles reach a barrier before one shared parser request', async () => {
+  let release, entered, active = 0, requests = 0, completed = 0, time = 0;
+  const gate = new Promise(resolve => { release = resolve; });
+  const ready = new Promise(resolve => { entered = resolve; });
+  const profiles = Array.from({ length: 20 }, (_, i) => ({ id: String(i + 1), isStopped: () => false, emit() {}, finish: async () => {} }));
+  const running = runCampaignCycles({ runId: 'root' }, {
+    automation: { maxPerProfile: 20, checkEverySent: 10 }, token: 'fake',
+    mailboxes: Object.fromEntries(profiles.map(p => [p.id, `${p.id}@example.com`])), parserRequest: {},
+    parserBatch: { run_id: 'root', received: 200, batches: profiles.map(p => ({ profile_id: p.id, ads: Array(10).fill({}) })) },
+  }, profiles, {
+    now: () => time, sleep: async ms => { time += ms; },
+    sendCycle: async (_context, _run, hooks) => {
+      if (!hooks.campaignState.sent) {
+        if (++active === 20) entered();
+        await gate;
+        active--; completed++;
+      }
+      hooks.campaignState.sent += 10;
+      return { sent: hooks.campaignState.sent, halted: false };
+    },
+    fetchImpl: async (_url, init) => {
+      requests++;
+      assert.equal(completed, 20);
+      assert.equal(active, 0);
+      const payload = JSON.parse(init.body);
+      assert.equal(Object.values(payload.profile_limits).reduce((a, b) => a + b, 0), 200);
+      return Response.json({ run_id: payload.run_id, parent_run_id: 'root', received: 200,
+        batches: profiles.map(p => ({ profile_id: p.id, ads: Array(10).fill({}) })) });
+    },
+  });
+  await ready;
+  assert.equal(active, 20);
+  assert.equal(requests, 0);
+  release(); await running;
+  assert.equal(requests, 1);
+  assert.ok(profiles.every(p => p.state.sent === 20 && !p.failed));
+});
+
+test('a profile closed during shared cooldown is removed before requesting ads', async () => {
+  let time = 0, closed = false, requests = 0;
+  const profiles = ['1', '2'].map(id => ({ id, isStopped: () => id === '1' && closed, emit() {}, finish: async () => {} }));
+  await runCampaignCycles({ runId: 'root' }, {
+    automation: { maxPerProfile: 20, checkEverySent: 10 }, token: 'fake', parserRequest: {},
+    mailboxes: { 1: 'one@example.com', 2: 'two@example.com' },
+    parserBatch: { run_id: 'root', received: 20, batches: profiles.map(p => ({ profile_id: p.id, ads: Array(10).fill({}) })) },
+  }, profiles, {
+    now: () => time, sleep: async ms => { time += ms; closed = true; },
+    sendCycle: async (_context, _run, hooks) => { hooks.campaignState.sent += 10; return { sent: hooks.campaignState.sent, halted: false }; },
+    fetchImpl: async (_url, init) => {
+      requests++;
+      const payload = JSON.parse(init.body);
+      assert.deepEqual(payload.profile_ids, ['2']);
+      assert.deepEqual(payload.profile_limits, { 2: 10 });
+      return Response.json({ run_id: payload.run_id, parent_run_id: 'root', received: 10, batches: [{ profile_id: '2', ads: Array(10).fill({}) }] });
+    },
+  });
+  assert.equal(requests, 1);
+  assert.equal(profiles[0].state.sent, 10);
+  assert.equal(profiles[1].state.sent, 20);
+});
+
+test('duplicate Gmail accounts are rejected before any sending or parser calls', async () => {
+  let finished = 0;
+  const profiles = ['1', '2'].map(id => ({ id, isStopped: () => false, emit() {}, finish: async () => { finished++; } }));
+  await runCampaignCycles({ runId: 'root' }, {
+    mailboxes: { 1: 'ME@example.com', 2: ' me@example.com ' }, parserBatch: {},
+  }, profiles, { sendCycle: async () => { assert.fail('duplicate mailbox sent'); }, fetchImpl: async () => { assert.fail('duplicate mailbox requested parser'); } });
+  assert.equal(finished, 2);
+  assert.ok(profiles.every(p => p.failed));
 });
