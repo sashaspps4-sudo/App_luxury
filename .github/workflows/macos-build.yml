@@ -2,6 +2,11 @@ name: macOS desktop build
 
 on:
   workflow_dispatch:
+    inputs:
+      include_intel:
+        description: Also build for Intel Macs
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -11,6 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        exclude: ${{ fromJSON(inputs.include_intel && '[]' || '[{"arch":"x64"}]') }}
         include:
           - runner: macos-15
             target: aarch64-apple-darwin
