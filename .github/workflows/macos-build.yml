@@ -16,14 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        exclude: ${{ fromJSON(inputs.include_intel && '[]' || '[{"arch":"x64"}]') }}
-        include:
-          - runner: macos-15
-            target: aarch64-apple-darwin
-            arch: arm64
-          - runner: macos-15-intel
-            target: x86_64-apple-darwin
-            arch: x64
+        include: ${{ fromJSON(inputs.include_intel && '[{"runner":"macos-15","target":"aarch64-apple-darwin","arch":"arm64"},{"runner":"macos-15-intel","target":"x86_64-apple-darwin","arch":"x64"}]' || '[{"runner":"macos-15","target":"aarch64-apple-darwin","arch":"arm64"}]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     defaults:
